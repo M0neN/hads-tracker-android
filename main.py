@@ -9,8 +9,10 @@ from kivy.uix.button import Button
 from kivy.uix.textinput import TextInput
 from kivy.uix.progressbar import ProgressBar
 from kivy.uix.popup import Popup
+from kivy.uix.widget import Widget
 from kivy.core.window import Window
-from kivy.graphics import Color, RoundedRectangle, Line
+from kivy.metrics import dp
+from kivy.graphics import Color, RoundedRectangle, Line, Ellipse
 from kivy.utils import get_color_from_hex
 
 Window.clearcolor = get_color_from_hex("#F1F5F9")
@@ -19,11 +21,11 @@ SECTIONS = [
     ("1. Госпитальная шкала тревоги и депрессии (HADS)", [
         ("1. Испытываю внутреннее напряжение, скованность:", "A", 
          ["Совсем не испытываю", "Время от времени", "Часто", "Постоянно"]),
-        ("2. То, что приносило радость, радует и сейчас:", "D", 
+        ("2. То, что приносило радость, доставляет удовольствие и сейчас:", "D", 
          ["Определенно так же", "Не в полной мере", "Лишь в малой степени", "Совсем не доставляет"]),
         ("3. Ощущение надвигающейся тревоги или страха:", "A", 
          ["Совсем нет", "Иногда, слабо", "Часто", "Постоянно и сильно"]),
-        ("4. Способен посмеяться и увидеть смешное:", "D", 
+        ("4. Способен посмеяться и увидеть смешное в событиях:", "D", 
          ["Всегда", "Часто", "Редко", "Совсем не способен"]),
         ("5. Беспокойные мысли занимают голову:", "A", 
          ["Лишь изредка", "Периодически", "Большую часть времени", "Постоянно"]),
@@ -76,10 +78,80 @@ class Card(BoxLayout):
         self.canvas.before.clear()
         with self.canvas.before:
             Color(*get_color_from_hex(self.bg_hex))
-            RoundedRectangle(pos=self.pos, size=self.size, radius=[self.radius_val])
+            RoundedRectangle(pos=self.pos, size=self.size, radius=[dp(self.radius_val)])
             Color(*get_color_from_hex(self.border_hex))
-            Line(rounded_rectangle=[self.x, self.y, self.width, self.height, self.radius_val], width=1)
+            Line(rounded_rectangle=[self.x, self.y, self.width, self.height, dp(self.radius_val)], width=1)
 
+class RadioCircle(Widget):
+    def __init__(self, is_selected=False, **kwargs):
+        super().__init__(**kwargs)
+        self.is_selected = is_selected
+        self.size_hint = (None, None)
+        self.size = (dp(22), dp(22))
+        self.bind(pos=self.redraw, size=self.redraw)
+
+    def set_state(self, selected):
+        self.is_selected = selected
+        self.redraw()
+
+    def redraw(self, *args):
+        self.canvas.clear()
+        with self.canvas:
+            if self.is_selected:
+                Color(*get_color_from_hex("#2563EB"))
+                Line(circle=(self.center_x, self.center_y, dp(9)), width=dp(2))
+                Color(*get_color_from_hex("#2563EB"))
+                Ellipse(pos=(self.center_x - dp(5), self.center_y - dp(5)), size=(dp(10), dp(10)))
+            else:
+                Color(*get_color_from_hex("#64748B"))
+                Line(circle=(self.center_x, self.center_y, dp(9)), width=dp(1.8))
+                Color(1, 1, 1, 1)
+                Ellipse(pos=(self.center_x - dp(4), self.center_y - dp(4)), size=(dp(8), dp(8)))
+
+class RadioRow(BoxLayout):
+    def __init__(self, text, on_select_cb, **kwargs):
+        super().__init__(**kwargs)
+        self.orientation = 'horizontal'
+        self.size_hint_y = None
+        self.height = dp(38)
+        self.spacing = dp(10)
+        self.padding = [dp(6), dp(4), dp(6), dp(4)]
+        self.on_select_cb = on_select_cb
+        self.is_selected = False
+
+        self.circle = RadioCircle(is_selected=False)
+        self.add_widget(self.circle)
+
+        self.lbl = Label(
+            text=text,
+            color=get_color_from_hex("#334155"),
+            font_size='12sp',
+            halign='left',
+            valign='middle'
+        )
+        self.lbl.bind(size=self.lbl.setter('text_size'))
+        self.add_widget(self.lbl)
+
+        self.bind(pos=self.update_bg, size=self.update_bg)
+
+    def on_touch_down(self, touch):
+        if self.collide_point(*touch.pos):
+            self.on_select_cb()
+            return True
+        return super().on_touch_down(touch)
+
+    def set_checked(self, checked):
+        self.is_selected = checked
+        self.circle.set_state(checked)
+        self.lbl.color = get_color_from_hex("#1E3A8A" if checked else "#334155")
+        self.update_bg()
+
+    def update_bg(self, *args):
+        self.canvas.before.clear()
+        if self.is_selected:
+            with self.canvas.before:
+                Color(*get_color_from_hex("#DBEAFE"))
+                RoundedRectangle(pos=self.pos, size=self.size, radius=[dp(6)])
 
 class HADSApp(App):
     def build(self):
@@ -89,22 +161,24 @@ class HADSApp(App):
 
         self.answers = {}
         self.q_types = {}
-        self.buttons = {}
+        self.radio_rows = {}
         self.selected_record_id = None
         self.selected_row_box = None
 
-        # Корневой экран с отступом под строку уведомлений Android
-        self.root = BoxLayout(orientation='vertical', padding=[10, 32, 10, 10], spacing=8)
+        self.root = BoxLayout(orientation='vertical', padding=[dp(12), dp(44), dp(12), dp(12)], spacing=dp(10))
 
         # Верхняя панель переключения вкладок
-        tab_bar = BoxLayout(orientation='horizontal', size_hint_y=None, height=44, spacing=6)
+        tab_bar = Card(
+            bg_color="#E2E8F0", border_color="#CBD5E1", radius=8,
+            orientation='horizontal', size_hint_y=None, height=dp(44), padding=dp(3), spacing=dp(4)
+        )
         self.tab_survey_btn = Button(
-            text="📋 Прохождение теста", bold=True, font_size='12.5sp',
+            text="Прохождение теста", bold=True, font_size='13sp',
             background_normal='', background_color=get_color_from_hex("#2563EB"),
             color=get_color_from_hex("#FFFFFF")
         )
         self.tab_data_btn = Button(
-            text="📈 Аналитика и датасет", bold=True, font_size='12.5sp',
+            text="Аналитика и датасет", bold=True, font_size='13sp',
             background_normal='', background_color=get_color_from_hex("#E2E8F0"),
             color=get_color_from_hex("#475569")
         )
@@ -114,15 +188,12 @@ class HADSApp(App):
         tab_bar.add_widget(self.tab_data_btn)
         self.root.add_widget(tab_bar)
 
-        # Контейнер содержимого активной вкладки
         self.content_area = BoxLayout(orientation='vertical')
         self.root.add_widget(self.content_area)
 
-        # Инициализация экранов
         self.init_survey_view()
         self.init_data_view()
 
-        # Старт с вкладки опросника
         self.switch_tab(0)
         return self.root
 
@@ -142,26 +213,25 @@ class HADSApp(App):
             self.refresh_table_data()
             self.content_area.add_widget(self.data_container)
 
-    # ---------------------------------------------------------
-    # ВКЛАДКА 1: ОПРОСНИК
-    # ---------------------------------------------------------
     def init_survey_view(self):
-        self.survey_scroll = ScrollView(size_hint=(1, 1), do_scroll_x=False, bar_width=5)
-        content = BoxLayout(orientation='vertical', size_hint_y=None, spacing=10, padding=[0, 4, 0, 8])
+        self.survey_scroll = ScrollView(size_hint=(1, 1), do_scroll_x=False, bar_width=dp(5))
+        content = BoxLayout(orientation='vertical', size_hint_y=None, spacing=dp(12), padding=[0, dp(4), 0, dp(25)])
         content.bind(minimum_height=content.setter('height'))
 
-        # Шапка прогресса
-        h_card = Card(orientation='vertical', size_hint_y=None, height=98, padding=10, spacing=4)
-        t_row = BoxLayout(orientation='horizontal', size_hint_y=None, height=24)
+        # Карточка шапки
+        h_card = Card(orientation='vertical', size_hint_y=None, padding=dp(14), spacing=dp(6))
+        h_card.bind(minimum_height=h_card.setter('height'))
+
+        t_row = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(26))
         today_str = datetime.now().strftime("%d.%m.%Y")
         t_title = Label(
-            text=f"[b]📅 Оценка за сутки ({today_str})[/b]", markup=True,
-            color=get_color_from_hex("#0F172A"), font_size='14sp', halign='left'
+            text=f"[b]Оценка за сутки ({today_str})[/b]", markup=True,
+            color=get_color_from_hex("#0F172A"), font_size='14.5sp', halign='left'
         )
         t_title.bind(size=t_title.setter('text_size'))
         self.progress_lbl = Label(
             text="0 / 20", bold=True,
-            color=get_color_from_hex("#2563EB"), font_size='13sp', size_hint_x=0.3, halign='right'
+            color=get_color_from_hex("#2563EB"), font_size='14sp', size_hint_x=0.25, halign='right'
         )
         self.progress_lbl.bind(size=self.progress_lbl.setter('text_size'))
         t_row.add_widget(t_title)
@@ -169,88 +239,83 @@ class HADSApp(App):
         h_card.add_widget(t_row)
 
         sub_lbl = Label(
-            text="Выбор показателей психосоматического состояния",
-            color=get_color_from_hex("#64748B"), font_size='11sp', size_hint_y=None, height=16, halign='left'
+            text="Фиксация показателей психосоматического статуса",
+            color=get_color_from_hex("#64748B"), font_size='11sp', size_hint_y=None, height=dp(18), halign='left'
         )
         sub_lbl.bind(size=sub_lbl.setter('text_size'))
         h_card.add_widget(sub_lbl)
 
-        self.pbar = ProgressBar(max=20, value=0, size_hint_y=None, height=12)
+        self.pbar = ProgressBar(max=20, value=0, size_hint_y=None, height=dp(14))
         h_card.add_widget(self.pbar)
         content.add_widget(h_card)
 
-        # Профиль
-        p_card = Card(orientation='horizontal', size_hint_y=None, height=54, padding=[10, 6, 10, 6], spacing=6)
+        # Карточка профиля
+        p_card = Card(orientation='horizontal', size_hint_y=None, height=dp(56), padding=[dp(12), dp(8), dp(12), dp(8)], spacing=dp(8))
         self.fio_input = TextInput(
             text="Студент", hint_text="ФИО / ID", multiline=False, size_hint_x=0.65,
             background_color=get_color_from_hex("#F8FAFC"), foreground_color=get_color_from_hex("#0F172A"),
-            padding=[8, 6, 8, 6]
+            padding=[dp(10), dp(8), dp(10), dp(8)], font_size='12.5sp'
         )
         self.age_input = TextInput(
             text="20", hint_text="Возраст", multiline=False, input_filter='int', size_hint_x=0.35,
             background_color=get_color_from_hex("#F8FAFC"), foreground_color=get_color_from_hex("#0F172A"),
-            padding=[8, 6, 8, 6]
+            padding=[dp(10), dp(8), dp(10), dp(8)], font_size='12.5sp'
         )
         p_card.add_widget(self.fio_input)
         p_card.add_widget(self.age_input)
         content.add_widget(p_card)
 
-        # Вопросы
+        # Карточки вопросов
         q_idx = 0
         for sec_title, items in SECTIONS:
             sec_header = Label(
                 text=f"[b]{sec_title}[/b]", markup=True,
-                color=get_color_from_hex("#1E3A8A"), font_size='13sp',
-                size_hint_y=None, height=30, halign='left'
+                color=get_color_from_hex("#1E3A8A"), font_size='13.5sp',
+                size_hint_y=None, height=dp(34), halign='left'
             )
             sec_header.bind(size=sec_header.setter('text_size'))
             content.add_widget(sec_header)
 
             for text, q_type, options in items:
                 self.q_types[q_idx] = q_type
-                self.buttons[q_idx] = []
+                self.radio_rows[q_idx] = []
 
-                card = Card(orientation='vertical', size_hint_y=None, height=185, padding=10, spacing=4)
+                card = Card(orientation='vertical', size_hint_y=None, padding=dp(12), spacing=dp(6))
+                card.bind(minimum_height=card.setter('height'))
+
                 q_lbl = Label(
                     text=f"[b]{text}[/b]", markup=True,
-                    color=get_color_from_hex("#0F172A"), font_size='12sp',
-                    size_hint_y=None, height=32, halign='left', valign='middle'
+                    color=get_color_from_hex("#0F172A"), font_size='12.5sp',
+                    size_hint_y=None, height=dp(36), halign='left', valign='middle'
                 )
                 q_lbl.bind(size=q_lbl.setter('text_size'))
                 card.add_widget(q_lbl)
 
                 for score, opt_text in enumerate(options):
-                    btn = Button(
-                        text=f"  ○  {opt_text}",
-                        size_hint_y=None, height=30,
-                        halign='left', valign='middle',
-                        font_size='11sp',
-                        background_normal='',
-                        background_color=get_color_from_hex("#F8FAFC"),
-                        color=get_color_from_hex("#334155")
+                    row = RadioRow(
+                        text=opt_text,
+                        on_select_cb=lambda qi=q_idx, sc=score: self.select_option(qi, sc)
                     )
-                    btn.bind(size=btn.setter('text_size'))
-                    btn.bind(on_press=lambda inst, qi=q_idx, sc=score, ot=opt_text: self.select_option(qi, sc, ot))
-                    self.buttons[q_idx].append((btn, opt_text))
-                    card.add_widget(btn)
+                    self.radio_rows[q_idx].append(row)
+                    card.add_widget(row)
 
                 content.add_widget(card)
                 q_idx += 1
 
-        # Живой счетчик
+        # Карточка живого счетчика
         live_card = Card(
             bg_color="#E2E8F0", border_color="#CBD5E1",
-            orientation='vertical', size_hint_y=None, height=66, padding=8, spacing=3
+            orientation='vertical', size_hint_y=None, height=dp(70), padding=dp(10), spacing=dp(4)
         )
         l_row1 = BoxLayout(orientation='horizontal')
-        self.live_anx = Label(text="Тревога: 0 б.", bold=True, color=get_color_from_hex("#1E293B"), font_size='11.5sp')
-        self.live_dep = Label(text="Депрессия: 0 б.", bold=True, color=get_color_from_hex("#1E293B"), font_size='11.5sp')
+        self.live_anx = Label(text="Тревога: 0 б.", bold=True, color=get_color_from_hex("#1E293B"), font_size='12sp')
+        self.live_dep = Label(text="Депрессия: 0 б.", bold=True, color=get_color_from_hex("#1E293B"), font_size='12sp')
         l_row1.add_widget(self.live_anx)
         l_row1.add_widget(self.live_dep)
 
         l_row2 = BoxLayout(orientation='horizontal')
-        self.live_slp = Label(text="Сон: 0 б.", bold=True, color=get_color_from_hex("#1E293B"), font_size='11.5sp')
-        self.live_phy = Label(text="Физ. дискомфорт: 0 б.", bold=True, color=get_color_from_hex("#1E293B"), font_size='11.5sp')
+        self.live_slp = Label(text="Сон: 0 б.", bold=True, color=get_color_from_hex("#1E293B"), font_size='12sp')
+        self.live_phy = Label(text="Физ. дискомфорт: 0 б.", bold=True, color=get_color_from_hex("#1E293B"), font_size='12sp')
         l_row2.add_widget(self.live_slp)
         l_row2.add_widget(self.live_phy)
 
@@ -258,10 +323,10 @@ class HADSApp(App):
         live_card.add_widget(l_row2)
         content.add_widget(live_card)
 
-        # Кнопка сохранения дня
+        # Кнопка сохранения
         save_btn = Button(
-            text="💾 Зафиксировать результат за день", bold=True, font_size='13sp',
-            size_hint_y=None, height=44,
+            text="Зафиксировать результат за день", bold=True, font_size='13sp',
+            size_hint_y=None, height=dp(48),
             background_normal='', background_color=get_color_from_hex("#2563EB"),
             color=get_color_from_hex("#FFFFFF")
         )
@@ -270,14 +335,10 @@ class HADSApp(App):
 
         self.survey_scroll.add_widget(content)
 
-    # ---------------------------------------------------------
-    # ВКЛАДКА 2: АНАЛИТИКА И ДАТАСЕТ
-    # ---------------------------------------------------------
     def init_data_view(self):
-        self.data_container = BoxLayout(orientation='vertical', spacing=8)
+        self.data_container = BoxLayout(orientation='vertical', spacing=dp(8))
 
-        # Карточки KPI
-        kpi_grid = GridLayout(cols=2, spacing=6, size_hint_y=None, height=110)
+        kpi_grid = GridLayout(cols=2, spacing=dp(8), size_hint_y=None, height=dp(120))
         self.kpi_total_card, self.kpi_total_val = self.create_kpi_card("Всего записей")
         self.kpi_anx_card, self.kpi_anx_val = self.create_kpi_card("Ср. тревога")
         self.kpi_dep_card, self.kpi_dep_val = self.create_kpi_card("Ср. депрессия")
@@ -289,8 +350,7 @@ class HADSApp(App):
         kpi_grid.add_widget(self.kpi_slp_card)
         self.data_container.add_widget(kpi_grid)
 
-        # Панель кнопок действий
-        actions_grid = GridLayout(cols=3, spacing=5, size_hint_y=None, height=76)
+        actions_grid = GridLayout(cols=3, spacing=dp(6), size_hint_y=None, height=dp(78))
         
         btn_refresh = Button(
             text="Обновить", font_size='11sp', bold=True,
@@ -300,28 +360,28 @@ class HADSApp(App):
         btn_refresh.bind(on_press=lambda inst: self.refresh_table_data())
 
         btn_summary = Button(
-            text="📊 Прогноз", font_size='11sp', bold=True,
+            text="Итоги и прогноз", font_size='11sp', bold=True,
             background_normal='', background_color=get_color_from_hex("#2563EB"),
             color=get_color_from_hex("#FFFFFF")
         )
         btn_summary.bind(on_press=lambda inst: self.show_summary_popup())
 
         btn_csv = Button(
-            text="📥 CSV", font_size='11sp', bold=True,
+            text="Экспорт CSV", font_size='11sp', bold=True,
             background_normal='', background_color=get_color_from_hex("#0D9488"),
             color=get_color_from_hex("#FFFFFF")
         )
         btn_csv.bind(on_press=lambda inst: self.export_csv())
 
         btn_report = Button(
-            text="📄 Отчет", font_size='11sp', bold=True,
+            text="Сводный отчет", font_size='11sp', bold=True,
             background_normal='', background_color=get_color_from_hex("#475569"),
             color=get_color_from_hex("#FFFFFF")
         )
         btn_report.bind(on_press=lambda inst: self.export_report())
 
         btn_delete = Button(
-            text="🗑 Удалить", font_size='11sp', bold=True,
+            text="Удалить запись", font_size='11sp', bold=True,
             background_normal='', background_color=get_color_from_hex("#EF4444"),
             color=get_color_from_hex("#FFFFFF")
         )
@@ -334,37 +394,33 @@ class HADSApp(App):
         actions_grid.add_widget(btn_delete)
         self.data_container.add_widget(actions_grid)
 
-        # Заголовок таблицы
+        # Шапка таблицы
         table_hdr = Card(
-            bg_color="#E2E8F0", border_color="#CBD5E1",
-            orientation='horizontal', size_hint_y=None, height=30, padding=[4, 0, 4, 0]
+            bg_color="#E2E8F0", border_color="#CBD5E1", radius=6,
+            orientation='horizontal', size_hint_y=None, height=dp(32), padding=[dp(4), 0, dp(4), 0]
         )
-        table_hdr.add_widget(Label(text="[b]ID[/b]", markup=True, color=get_color_from_hex("#334155"), font_size='10sp', size_hint_x=0.12))
-        table_hdr.add_widget(Label(text="[b]Дата[/b]", markup=True, color=get_color_from_hex("#334155"), font_size='10sp', size_hint_x=0.32))
-        table_hdr.add_widget(Label(text="[b]Трев.[/b]", markup=True, color=get_color_from_hex("#334155"), font_size='10sp', size_hint_x=0.18))
-        table_hdr.add_widget(Label(text="[b]Депр.[/b]", markup=True, color=get_color_from_hex("#334155"), font_size='10sp', size_hint_x=0.18))
-        table_hdr.add_widget(Label(text="[b]Сон[/b]", markup=True, color=get_color_from_hex("#334155"), font_size='10sp', size_hint_x=0.10))
-        table_hdr.add_widget(Label(text="[b]Физ.[/b]", markup=True, color=get_color_from_hex("#334155"), font_size='10sp', size_hint_x=0.10))
+        table_hdr.add_widget(Label(text="[b]ID[/b]", markup=True, color=get_color_from_hex("#334155"), font_size='10.5sp', size_hint_x=0.12))
+        table_hdr.add_widget(Label(text="[b]Дата[/b]", markup=True, color=get_color_from_hex("#334155"), font_size='10.5sp', size_hint_x=0.32))
+        table_hdr.add_widget(Label(text="[b]Трев.[/b]", markup=True, color=get_color_from_hex("#334155"), font_size='10.5sp', size_hint_x=0.18))
+        table_hdr.add_widget(Label(text="[b]Депр.[/b]", markup=True, color=get_color_from_hex("#334155"), font_size='10.5sp', size_hint_x=0.18))
+        table_hdr.add_widget(Label(text="[b]Сон[/b]", markup=True, color=get_color_from_hex("#334155"), font_size='10.5sp', size_hint_x=0.10))
+        table_hdr.add_widget(Label(text="[b]Физ.[/b]", markup=True, color=get_color_from_hex("#334155"), font_size='10.5sp', size_hint_x=0.10))
         self.data_container.add_widget(table_hdr)
 
-        # Скролл строк таблицы
-        self.table_scroll = ScrollView(size_hint=(1, 1), do_scroll_x=False, bar_width=4)
-        self.table_rows_box = BoxLayout(orientation='vertical', size_hint_y=None, spacing=3)
+        self.table_scroll = ScrollView(size_hint=(1, 1), do_scroll_x=False, bar_width=dp(4))
+        self.table_rows_box = BoxLayout(orientation='vertical', size_hint_y=None, spacing=dp(4))
         self.table_rows_box.bind(minimum_height=self.table_rows_box.setter('height'))
         self.table_scroll.add_widget(self.table_rows_box)
         self.data_container.add_widget(self.table_scroll)
 
     def create_kpi_card(self, title):
-        card = Card(orientation='vertical', padding=6, spacing=2)
+        card = Card(orientation='vertical', padding=dp(8), spacing=dp(2))
         t_lbl = Label(text=title, color=get_color_from_hex("#64748B"), font_size='10.5sp', bold=True)
-        v_lbl = Label(text="0.0", color=get_color_from_hex("#0F172A"), font_size='16sp', bold=True)
+        v_lbl = Label(text="0.0", color=get_color_from_hex("#0F172A"), font_size='17sp', bold=True)
         card.add_widget(t_lbl)
         card.add_widget(v_lbl)
         return card, v_lbl
 
-    # ---------------------------------------------------------
-    # ЛОГИКА И БАЗА ДАННЫХ
-    # ---------------------------------------------------------
     def init_db(self):
         with sqlite3.connect(self.db_path) as conn:
             conn.cursor().execute("""CREATE TABLE IF NOT EXISTS results (
@@ -376,17 +432,10 @@ class HADSApp(App):
             )""")
             conn.commit()
 
-    def select_option(self, q_idx, score, opt_text):
+    def select_option(self, q_idx, score):
         self.answers[q_idx] = score
-        for btn, text in self.buttons[q_idx]:
-            if text == opt_text:
-                btn.text = f"  ◉  {text}"
-                btn.background_color = get_color_from_hex("#DBEAFE")
-                btn.color = get_color_from_hex("#1E3A8A")
-            else:
-                btn.text = f"  ○  {text}"
-                btn.background_color = get_color_from_hex("#F8FAFC")
-                btn.color = get_color_from_hex("#334155")
+        for sc, row in enumerate(self.radio_rows[q_idx]):
+            row.set_checked(sc == score)
 
         ans_count = len(self.answers)
         self.pbar.value = ans_count
@@ -408,13 +457,13 @@ class HADSApp(App):
         return "Клинический"
 
     def show_alert(self, title, text):
-        layout = BoxLayout(orientation='vertical', padding=10, spacing=8)
+        layout = BoxLayout(orientation='vertical', padding=dp(12), spacing=dp(10))
         layout.add_widget(Label(text=text, color=get_color_from_hex("#FFFFFF"), font_size='12sp', halign='center'))
         btn = Button(
-            text="OK", size_hint_y=None, height=36,
+            text="OK", size_hint_y=None, height=dp(38),
             background_normal='', background_color=get_color_from_hex("#2563EB")
         )
-        popup = Popup(title=title, content=layout, size_hint=(0.85, 0.42))
+        popup = Popup(title=title, content=layout, size_hint=(0.85, 0.44))
         btn.bind(on_press=popup.dismiss)
         layout.add_widget(btn)
         popup.open()
@@ -442,13 +491,10 @@ class HADSApp(App):
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (now_str, fio, age, "Мужской", anx, anx_st, dep, dep_st, slp, phy))
             conn.commit()
 
-        # Сброс опросника
         self.answers.clear()
-        for qi, b_list in self.buttons.items():
-            for btn, text in b_list:
-                btn.text = f"  ○  {text}"
-                btn.background_color = get_color_from_hex("#F8FAFC")
-                btn.color = get_color_from_hex("#334155")
+        for qi in self.radio_rows:
+            for row in self.radio_rows[qi]:
+                row.set_checked(False)
 
         self.pbar.value = 0
         self.progress_lbl.text = "0 / 20"
@@ -487,27 +533,20 @@ class HADSApp(App):
             rec_id = r[0]
             row_box = Card(
                 bg_color="#FFFFFF", border_color="#E2E8F0", radius=6,
-                orientation='horizontal', size_hint_y=None, height=36, padding=[4, 0, 4, 0]
+                orientation='horizontal', size_hint_y=None, height=dp(38), padding=[dp(4), 0, dp(4), 0]
             )
             short_date = r[1][5:16] if len(r[1]) >= 16 else r[1]
-            row_box.add_widget(Label(text=str(rec_id), color=get_color_from_hex("#0F172A"), font_size='10sp', size_hint_x=0.12))
+            row_box.add_widget(Label(text=str(rec_id), color=get_color_from_hex("#0F172A"), font_size='10.5sp', size_hint_x=0.12))
             row_box.add_widget(Label(text=short_date, color=get_color_from_hex("#475569"), font_size='9.5sp', size_hint_x=0.32))
             row_box.add_widget(Label(text=f"{r[5]} ({r[6][:3]})", color=get_color_from_hex("#1E3A8A"), font_size='9.5sp', size_hint_x=0.18))
             row_box.add_widget(Label(text=f"{r[7]} ({r[8][:3]})", color=get_color_from_hex("#1E3A8A"), font_size='9.5sp', size_hint_x=0.18))
-            row_box.add_widget(Label(text=str(r[9]), color=get_color_from_hex("#0F172A"), font_size='10sp', size_hint_x=0.10))
-            row_box.add_widget(Label(text=str(r[10]), color=get_color_from_hex("#0F172A"), font_size='10sp', size_hint_x=0.10))
+            row_box.add_widget(Label(text=str(r[9]), color=get_color_from_hex("#0F172A"), font_size='10.5sp', size_hint_x=0.10))
+            row_box.add_widget(Label(text=str(r[10]), color=get_color_from_hex("#0F172A"), font_size='10.5sp', size_hint_x=0.10))
 
-            # Клик по строке для выбора
-            select_btn = Button(
-                size_hint=(1, 1), background_normal='', background_color=(0, 0, 0, 0)
-            )
-            select_btn.bind(on_press=lambda inst, rid=rec_id, rbox=row_box: self.select_table_row(rid, rbox))
-            
-            # Контейнер наложения кнопки поверх строки
-            wrapper = BoxLayout(size_hint_y=None, height=36)
-            wrapper.add_widget(row_box)
-            row_box.add_widget(select_btn)
-            self.table_rows_box.add_widget(wrapper)
+            btn = Button(size_hint=(1, 1), background_normal='', background_color=(0, 0, 0, 0))
+            btn.bind(on_press=lambda inst, rid=rec_id, rbox=row_box: self.select_table_row(rid, rbox))
+            row_box.add_widget(btn)
+            self.table_rows_box.add_widget(row_box)
 
     def select_table_row(self, rec_id, row_box):
         if self.selected_row_box:
@@ -562,7 +601,7 @@ class HADSApp(App):
             f"• Связь тонуса и депрессии (r): {r_phy_dep:.2f}\n\n"
             f"Итог: {verdict}"
         )
-        self.show_alert("📊 Предиктивный отчет", text)
+        self.show_alert("Предиктивный отчет", text)
 
     def export_csv(self):
         with sqlite3.connect(self.db_path) as conn:
