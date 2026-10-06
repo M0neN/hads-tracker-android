@@ -18,20 +18,24 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
       - name: Install system dependencies
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y autoconf automake libtool libtool-bin libltdl-dev pkg-config zlib1g-dev libncurses-dev cmake libffi-dev libssl-dev libsqlite3-dev
+          sudo apt-get install -y autoconf automake libtool libtool-bin libltdl-dev pkg-config zlib1g-dev cmake libffi-dev libssl-dev libsqlite3-dev
+          pip install --upgrade Cython buildozer git+https://github.com/kivy/python-for-android.git
 
-      - name: Build with Buildozer Action
-        uses: ArtemSBulgakov/buildozer-action@v1
-        id: buildozer
-        with:
-          workdir: .
-          buildozer_version: master
+      - name: Build APK with Buildozer
+        run: |
+          buildozer -v android debug
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: HADS-Tracker-APK
-          path: ${{ steps.buildozer.outputs.filename }}
+          path: bin/*.apk
