@@ -433,7 +433,7 @@ class HADSApp(App):
 
         # Шапка таблицы
         tbl_hdr_box = BoxLayout(orientation='horizontal', size_hint=(None, None), width=total_tbl_w, height=dp(34))
-        hdr_titles = ["ID", "Дата", "Участник", "Возраст", "Пол", "Тревога", "Статус Т.", "Деelf.content_area.add_widget(self.survey_scroll)
+        hdr_titles = ["ID", "Дата", "Участник", "Возраст", "Пол", "Тревога", "Статус Т.", "Депрессия", "Статус Д.", "Сон", "Физ."]
         else:
             self.tab_data_btn.background_color = get_color_from_hex("#2563EB")
             self.tab_data_btn.color = get_color_from_hex("#FFFFFF")
