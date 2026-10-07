@@ -1,5 +1,4 @@
 import sqlite3, csv, os, json, urllib.request, threading, ssl
-ssl._create_default_https_context = ssl._create_unverified_context
 from datetime import datetime
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
@@ -17,6 +16,7 @@ from kivy.clock import Clock, mainthread
 from kivy.graphics import Color, RoundedRectangle, Line, Ellipse
 from kivy.utils import get_color_from_hex
 
+ssl._create_default_https_context = ssl._create_unverified_context
 SYNC_URL = "https://zovx-2c6bc-default-rtdb.firebaseio.com/records.json"
 
 Window.clearcolor = get_color_from_hex("#F1F5F9")
@@ -208,10 +208,6 @@ class HADSApp(App):
         self.switch_tab(0)
         return self.root
 
-    def on_start(self):
-        threading.Thread(target=lambda: self.sync_data(silent=True), daemon=True).start()
-        Clock.schedule_interval(lambda dt: threading.Thread(target=lambda: self.sync_data(silent=True), daemon=True).start(), 60)
-
     def switch_tab(self, tab_index):
         self.content_area.clear_widgets()
         if tab_index == 0:
@@ -227,7 +223,6 @@ class HADSApp(App):
             self.tab_survey_btn.color = get_color_from_hex("#475569")
             self.refresh_table_data()
             self.content_area.add_widget(self.data_container)
-            threading.Thread(target=lambda: self.sync_data(silent=True), daemon=True).start()
 
     def init_survey_view(self):
         self.survey_scroll = ScrollView(size_hint=(1, 1), do_scroll_x=False, bar_width=dp(5))
@@ -518,8 +513,6 @@ class HADSApp(App):
                                 depression, depression_status, sleep, physical)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (now_str, fio, age, "Мужской", anx, anx_st, dep, dep_st, slp, phy))
             conn.commit()
-
-        threading.Thread(target=lambda: self.sync_data(silent=True), daemon=True).start()
 
         self.answers.clear()
         for qi in self.radio_rows:
