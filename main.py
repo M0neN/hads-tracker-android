@@ -17,7 +17,7 @@ from kivy.clock import Clock, mainthread
 from kivy.graphics import Color, RoundedRectangle, Line, Ellipse
 from kivy.utils import get_color_from_hex
 
-SYNC_URL = "https://hads-tracker-sync-default-rtdb.firebaseio.com/records.json"
+SYNC_URL = "https://zovx-2c6bc-default-rtdb.firebaseio.com/records.json"
 
 Window.clearcolor = get_color_from_hex("#F1F5F9")
 
