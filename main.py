@@ -421,6 +421,219 @@ class HADSApp(App):
         actions_grid.add_widget(btn_delete)
         self.data_container.add_widget(actions_grid)
 
+        # Таблица с горизонтальной прокруткой
+        self.table_widths = [
+            dp(45), dp(130), dp(110), dp(55), dp(65),
+            dp(65), dp(100), dp(65), dp(100), dp(50), dp(55)
+        ]
+        total_tbl_w = sum(self.table_widths)
+
+        self.table_hscroll = ScrollView(size_hint=(1, 1), do_scroll_x=True, do_scroll_y=False, bar_width=dp(4))
+        table_inner_box = BoxLayout(orientation='vertical', size_hint=(None, 1), width=total_tbl_w)
+
+        # Шапка таблицы
+        tbl_hdr_box = BoxLayout(orientation='horizontal', size_hint=(None, None), width=total_tbl_w, height=dp(34))
+        hdr_titles = ["ID", "Дата", "Участник", "Возраст", "Пол", "Тревога", "Статус Т.", "Деelf.content_area.add_widget(self.survey_scroll)
+        else:
+            self.tab_data_btn.background_color = get_color_from_hex("#2563EB")
+            self.tab_data_btn.color = get_color_from_hex("#FFFFFF")
+            self.tab_survey_btn.background_color = get_color_from_hex("#E2E8F0")
+            self.tab_survey_btn.color = get_color_from_hex("#475569")
+            self.refresh_table_data()
+            self.content_area.add_widget(self.data_container)
+            threading.Thread(target=lambda: self.sync_data(silent=True), daemon=True).start()
+
+    def init_survey_view(self):
+        self.survey_scroll = ScrollView(size_hint=(1, 1), do_scroll_x=False, bar_width=dp(5))
+        content = BoxLayout(orientation='vertical', size_hint_y=None, spacing=dp(12), padding=[0, dp(4), 0, dp(25)])
+        content.bind(minimum_height=content.setter('height'))
+
+        # Шапка прогресса
+        h_card = Card(orientation='vertical', size_hint_y=None, padding=dp(12), spacing=dp(5))
+        h_card.bind(minimum_height=h_card.setter('height'))
+
+        t_row = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(26))
+        today_str = datetime.now().strftime("%d.%m.%Y")
+        t_title = Label(
+            text=f"[b]Оценка за сутки ({today_str})[/b]", markup=True,
+            color=get_color_from_hex("#0F172A"), font_size='14sp', halign='left'
+        )
+        t_title.bind(size=t_title.setter('text_size'))
+        self.progress_lbl = Label(
+            text="0 / 20", bold=True,
+            color=get_color_from_hex("#2563EB"), font_size='13.5sp', size_hint_x=0.25, halign='right'
+        )
+        self.progress_lbl.bind(size=self.progress_lbl.setter('text_size'))
+        t_row.add_widget(t_title)
+        t_row.add_widget(self.progress_lbl)
+        h_card.add_widget(t_row)
+
+        sub_lbl = Label(
+            text="Фиксация показателей психосоматического статуса",
+            color=get_color_from_hex("#64748B"), font_size='11sp', size_hint_y=None, height=dp(18), halign='left'
+        )
+        sub_lbl.bind(size=sub_lbl.setter('text_size'))
+        h_card.add_widget(sub_lbl)
+
+        self.pbar = ProgressBar(max=20, value=0, size_hint_y=None, height=dp(12))
+        h_card.add_widget(self.pbar)
+        content.add_widget(h_card)
+
+        # Профиль
+        p_card = Card(orientation='horizontal', size_hint_y=None, height=dp(54), padding=[dp(10), dp(6), dp(10), dp(6)], spacing=dp(8))
+        self.fio_input = TextInput(
+            text="Студент", hint_text="ФИО / ID", multiline=False, size_hint_x=0.65,
+            background_color=get_color_from_hex("#F8FAFC"), foreground_color=get_color_from_hex("#0F172A"),
+            padding=[dp(10), dp(8), dp(10), dp(8)], font_size='12sp'
+        )
+        self.age_input = TextInput(
+            text="20", hint_text="Возраст", multiline=False, input_filter='int', size_hint_x=0.35,
+            background_color=get_color_from_hex("#F8FAFC"), foreground_color=get_color_from_hex("#0F172A"),
+            padding=[dp(10), dp(8), dp(10), dp(8)], font_size='12sp'
+        )
+        p_card.add_widget(self.fio_input)
+        p_card.add_widget(self.age_input)
+        content.add_widget(p_card)
+
+        # Вопросы
+        q_idx = 0
+        for sec_title, items in SECTIONS:
+            sec_header = Label(
+                text=f"[b]{sec_title}[/b]", markup=True,
+                color=get_color_from_hex("#1E3A8A"), font_size='13sp',
+                size_hint_y=None, height=dp(32), halign='left'
+            )
+            sec_header.bind(size=sec_header.setter('text_size'))
+            content.add_widget(sec_header)
+
+            for text, q_type, options in items:
+                self.q_types[q_idx] = q_type
+                self.radio_rows[q_idx] = []
+
+                card = Card(orientation='vertical', size_hint_y=None, padding=dp(12), spacing=dp(5))
+                card.bind(minimum_height=card.setter('height'))
+
+                q_lbl = Label(
+                    text=f"[b]{text}[/b]", markup=True,
+                    color=get_color_from_hex("#0F172A"), font_size='12sp',
+                    size_hint_y=None, height=dp(34), halign='left', valign='middle'
+                )
+                q_lbl.bind(size=q_lbl.setter('text_size'))
+                card.add_widget(q_lbl)
+
+                for score, opt_text in enumerate(options):
+                    row = RadioRow(
+                        text=opt_text,
+                        on_select_cb=lambda qi=q_idx, sc=score: self.select_option(qi, sc)
+                    )
+                    self.radio_rows[q_idx].append(row)
+                    card.add_widget(row)
+
+                content.add_widget(card)
+                q_idx += 1
+
+        # Живой счетчик
+        live_card = Card(
+            bg_color="#E2E8F0", border_color="#CBD5E1",
+            orientation='vertical', size_hint_y=None, height=dp(68), padding=dp(8), spacing=dp(3)
+        )
+        l_row1 = BoxLayout(orientation='horizontal')
+        self.live_anx = Label(text="Тревога: 0 б.", bold=True, color=get_color_from_hex("#1E293B"), font_size='11.5sp')
+        self.live_dep = Label(text="Депрессия: 0 б.", bold=True, color=get_color_from_hex("#1E293B"), font_size='11.5sp')
+        l_row1.add_widget(self.live_anx)
+        l_row1.add_widget(self.live_dep)
+
+        l_row2 = BoxLayout(orientation='horizontal')
+        self.live_slp = Label(text="Сон: 0 б.", bold=True, color=get_color_from_hex("#1E293B"), font_size='11.5sp')
+        self.live_phy = Label(text="Физ. дискомфорт: 0 б.", bold=True, color=get_color_from_hex("#1E293B"), font_size='11.5sp')
+        l_row2.add_widget(self.live_slp)
+        l_row2.add_widget(self.live_phy)
+
+        live_card.add_widget(l_row1)
+        live_card.add_widget(l_row2)
+        content.add_widget(live_card)
+
+        # Кнопка сохранения
+        save_btn = Button(
+            text="Зафиксировать результат за день", bold=True, font_size='13sp',
+            size_hint_y=None, height=dp(46),
+            background_normal='', background_color=get_color_from_hex("#2563EB"),
+            color=get_color_from_hex("#FFFFFF")
+        )
+        save_btn.bind(on_press=self.save_data)
+        content.add_widget(save_btn)
+
+        self.survey_scroll.add_widget(content)
+
+    def init_data_view(self):
+        self.data_container = BoxLayout(orientation='vertical', spacing=dp(8))
+
+        # Карточки KPI
+        kpi_grid = GridLayout(cols=2, spacing=dp(6), size_hint_y=None, height=dp(114))
+        self.kpi_total_card, self.kpi_total_val = self.create_kpi_card("Всего записей")
+        self.kpi_anx_card, self.kpi_anx_val = self.create_kpi_card("Ср. тревога")
+        self.kpi_dep_card, self.kpi_dep_val = self.create_kpi_card("Ср. депрессия")
+        self.kpi_slp_card, self.kpi_slp_val = self.create_kpi_card("Ср. балл сна")
+
+        kpi_grid.add_widget(self.kpi_total_card)
+        kpi_grid.add_widget(self.kpi_anx_card)
+        kpi_grid.add_widget(self.kpi_dep_card)
+        kpi_grid.add_widget(self.kpi_slp_card)
+        self.data_container.add_widget(kpi_grid)
+
+        # Панель кнопок
+        actions_grid = GridLayout(cols=3, spacing=dp(5), size_hint_y=None, height=dp(76))
+        
+        btn_refresh = Button(
+            text="Обновить", font_size='11sp', bold=True,
+            background_normal='', background_color=get_color_from_hex("#FFFFFF"),
+            color=get_color_from_hex("#334155")
+        )
+        btn_refresh.bind(on_press=lambda inst: self.refresh_table_data())
+
+        btn_sync = Button(
+            text="Синхронизация", font_size='11sp', bold=True,
+            background_normal='', background_color=get_color_from_hex("#2563EB"),
+            color=get_color_from_hex("#FFFFFF")
+        )
+        btn_sync.bind(on_press=lambda inst: threading.Thread(target=lambda: self.sync_data(silent=False), daemon=True).start())
+
+        btn_summary = Button(
+            text="Итоги и прогноз", font_size='11sp', bold=True,
+            background_normal='', background_color=get_color_from_hex("#3B82F6"),
+            color=get_color_from_hex("#FFFFFF")
+        )
+        btn_summary.bind(on_press=lambda inst: self.show_summary_popup())
+
+        btn_csv = Button(
+            text="Экспорт CSV", font_size='11sp', bold=True,
+            background_normal='', background_color=get_color_from_hex("#0D9488"),
+            color=get_color_from_hex("#FFFFFF")
+        )
+        btn_csv.bind(on_press=lambda inst: self.export_csv())
+
+        btn_pdf = Button(
+            text="Протокол в PDF", font_size='11sp', bold=True,
+            background_normal='', background_color=get_color_from_hex("#475569"),
+            color=get_color_from_hex("#FFFFFF")
+        )
+        btn_pdf.bind(on_press=lambda inst: self.export_pdf())
+
+        btn_delete = Button(
+            text="Удалить запись", font_size='11sp', bold=True,
+            background_normal='', background_color=get_color_from_hex("#EF4444"),
+            color=get_color_from_hex("#FFFFFF")
+        )
+        btn_delete.bind(on_press=lambda inst: self.delete_selected_record())
+
+        actions_grid.add_widget(btn_refresh)
+        actions_grid.add_widget(btn_sync)
+        actions_grid.add_widget(btn_summary)
+        actions_grid.add_widget(btn_csv)
+        actions_grid.add_widget(btn_pdf)
+        actions_grid.add_widget(btn_delete)
+        self.data_container.add_widget(actions_grid)
+
         # ТАБЛИЦА С ГОРИЗОНТАЛЬНОЙ ПРОКРУТКОЙ
         self.table_widths = [
             dp(45), dp(130), dp(110), dp(55), dp(65),
