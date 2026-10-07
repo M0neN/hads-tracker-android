@@ -28,8 +28,7 @@ jobs:
         run: |
           sudo apt-get update -y
           sudo apt-get install -y autoconf automake libtool libtool-bin libltdl-dev pkg-config zlib1g-dev cmake libffi-dev libssl-dev libsqlite3-dev
-          pip install --upgrade Cython buildozer "git+[https://github.com/kivy/python-for-android.git](https://github.com/kivy/python-for-android.git)"
-          
+          pip install --upgrade Cython buildozer "git+https://github.com/kivy/python-for-android.git"
       - name: Build APK with Buildozer
         run: |
           buildozer -v android debug
