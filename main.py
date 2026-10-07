@@ -1,4 +1,5 @@
-import sqlite3, csv, os, json, urllib.request, threading
+import sqlite3, csv, os, json, urllib.request, threading, ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 from datetime import datetime
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
