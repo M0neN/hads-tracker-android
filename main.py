@@ -16,7 +16,6 @@ from kivy.clock import Clock, mainthread
 from kivy.graphics import Color, RoundedRectangle, Line, Ellipse
 from kivy.utils import get_color_from_hex
 
-# Единый защищенный канал автоматической синхронизации
 SYNC_URL = "https://hads-tracker-sync-default-rtdb.firebaseio.com/records.json"
 
 Window.clearcolor = get_color_from_hex("#F1F5F9")
@@ -179,7 +178,6 @@ class HADSApp(App):
 
         self.root = BoxLayout(orientation='vertical', padding=[dp(10), dp(42), dp(10), dp(10)], spacing=dp(8))
 
-        # Переключатель вкладок
         tab_bar = Card(
             bg_color="#E2E8F0", border_color="#CBD5E1", radius=8,
             orientation='horizontal', size_hint_y=None, height=dp(44), padding=dp(3), spacing=dp(4)
@@ -235,7 +233,6 @@ class HADSApp(App):
         content = BoxLayout(orientation='vertical', size_hint_y=None, spacing=dp(12), padding=[0, dp(4), 0, dp(25)])
         content.bind(minimum_height=content.setter('height'))
 
-        # Шапка прогресса
         h_card = Card(orientation='vertical', size_hint_y=None, padding=dp(12), spacing=dp(5))
         h_card.bind(minimum_height=h_card.setter('height'))
 
@@ -266,7 +263,6 @@ class HADSApp(App):
         h_card.add_widget(self.pbar)
         content.add_widget(h_card)
 
-        # Профиль
         p_card = Card(orientation='horizontal', size_hint_y=None, height=dp(54), padding=[dp(10), dp(6), dp(10), dp(6)], spacing=dp(8))
         self.fio_input = TextInput(
             text="Студент", hint_text="ФИО / ID", multiline=False, size_hint_x=0.65,
@@ -282,7 +278,6 @@ class HADSApp(App):
         p_card.add_widget(self.age_input)
         content.add_widget(p_card)
 
-        # Вопросы
         q_idx = 0
         for sec_title, items in SECTIONS:
             sec_header = Label(
@@ -319,7 +314,6 @@ class HADSApp(App):
                 content.add_widget(card)
                 q_idx += 1
 
-        # Живой счетчик
         live_card = Card(
             bg_color="#E2E8F0", border_color="#CBD5E1",
             orientation='vertical', size_hint_y=None, height=dp(68), padding=dp(8), spacing=dp(3)
@@ -340,7 +334,6 @@ class HADSApp(App):
         live_card.add_widget(l_row2)
         content.add_widget(live_card)
 
-        # Кнопка сохранения
         save_btn = Button(
             text="Зафиксировать результат за день", bold=True, font_size='13sp',
             size_hint_y=None, height=dp(46),
@@ -355,7 +348,6 @@ class HADSApp(App):
     def init_data_view(self):
         self.data_container = BoxLayout(orientation='vertical', spacing=dp(8))
 
-        # Карточки KPI
         kpi_grid = GridLayout(cols=2, spacing=dp(6), size_hint_y=None, height=dp(114))
         self.kpi_total_card, self.kpi_total_val = self.create_kpi_card("Всего записей")
         self.kpi_anx_card, self.kpi_anx_val = self.create_kpi_card("Ср. тревога")
@@ -368,7 +360,6 @@ class HADSApp(App):
         kpi_grid.add_widget(self.kpi_slp_card)
         self.data_container.add_widget(kpi_grid)
 
-        # Панель кнопок
         actions_grid = GridLayout(cols=3, spacing=dp(5), size_hint_y=None, height=dp(76))
         
         btn_refresh = Button(
@@ -421,7 +412,6 @@ class HADSApp(App):
         actions_grid.add_widget(btn_delete)
         self.data_container.add_widget(actions_grid)
 
-        # Таблица с горизонтальной прокруткой
         self.table_widths = [
             dp(45), dp(130), dp(110), dp(55), dp(65),
             dp(65), dp(100), dp(65), dp(100), dp(50), dp(55)
@@ -431,220 +421,6 @@ class HADSApp(App):
         self.table_hscroll = ScrollView(size_hint=(1, 1), do_scroll_x=True, do_scroll_y=False, bar_width=dp(4))
         table_inner_box = BoxLayout(orientation='vertical', size_hint=(None, 1), width=total_tbl_w)
 
-        # Шапка таблицы
-        tbl_hdr_box = BoxLayout(orientation='horizontal', size_hint=(None, None), width=total_tbl_w, height=dp(34))
-        hdr_titles = ["ID", "Дата", "Участник", "Возраст", "Пол", "Тревога", "Статус Т.", "Депрессия", "Статус Д.", "Сон", "Физ."]
-        else:
-            self.tab_data_btn.background_color = get_color_from_hex("#2563EB")
-            self.tab_data_btn.color = get_color_from_hex("#FFFFFF")
-            self.tab_survey_btn.background_color = get_color_from_hex("#E2E8F0")
-            self.tab_survey_btn.color = get_color_from_hex("#475569")
-            self.refresh_table_data()
-            self.content_area.add_widget(self.data_container)
-            threading.Thread(target=lambda: self.sync_data(silent=True), daemon=True).start()
-
-    def init_survey_view(self):
-        self.survey_scroll = ScrollView(size_hint=(1, 1), do_scroll_x=False, bar_width=dp(5))
-        content = BoxLayout(orientation='vertical', size_hint_y=None, spacing=dp(12), padding=[0, dp(4), 0, dp(25)])
-        content.bind(minimum_height=content.setter('height'))
-
-        # Шапка прогресса
-        h_card = Card(orientation='vertical', size_hint_y=None, padding=dp(12), spacing=dp(5))
-        h_card.bind(minimum_height=h_card.setter('height'))
-
-        t_row = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(26))
-        today_str = datetime.now().strftime("%d.%m.%Y")
-        t_title = Label(
-            text=f"[b]Оценка за сутки ({today_str})[/b]", markup=True,
-            color=get_color_from_hex("#0F172A"), font_size='14sp', halign='left'
-        )
-        t_title.bind(size=t_title.setter('text_size'))
-        self.progress_lbl = Label(
-            text="0 / 20", bold=True,
-            color=get_color_from_hex("#2563EB"), font_size='13.5sp', size_hint_x=0.25, halign='right'
-        )
-        self.progress_lbl.bind(size=self.progress_lbl.setter('text_size'))
-        t_row.add_widget(t_title)
-        t_row.add_widget(self.progress_lbl)
-        h_card.add_widget(t_row)
-
-        sub_lbl = Label(
-            text="Фиксация показателей психосоматического статуса",
-            color=get_color_from_hex("#64748B"), font_size='11sp', size_hint_y=None, height=dp(18), halign='left'
-        )
-        sub_lbl.bind(size=sub_lbl.setter('text_size'))
-        h_card.add_widget(sub_lbl)
-
-        self.pbar = ProgressBar(max=20, value=0, size_hint_y=None, height=dp(12))
-        h_card.add_widget(self.pbar)
-        content.add_widget(h_card)
-
-        # Профиль
-        p_card = Card(orientation='horizontal', size_hint_y=None, height=dp(54), padding=[dp(10), dp(6), dp(10), dp(6)], spacing=dp(8))
-        self.fio_input = TextInput(
-            text="Студент", hint_text="ФИО / ID", multiline=False, size_hint_x=0.65,
-            background_color=get_color_from_hex("#F8FAFC"), foreground_color=get_color_from_hex("#0F172A"),
-            padding=[dp(10), dp(8), dp(10), dp(8)], font_size='12sp'
-        )
-        self.age_input = TextInput(
-            text="20", hint_text="Возраст", multiline=False, input_filter='int', size_hint_x=0.35,
-            background_color=get_color_from_hex("#F8FAFC"), foreground_color=get_color_from_hex("#0F172A"),
-            padding=[dp(10), dp(8), dp(10), dp(8)], font_size='12sp'
-        )
-        p_card.add_widget(self.fio_input)
-        p_card.add_widget(self.age_input)
-        content.add_widget(p_card)
-
-        # Вопросы
-        q_idx = 0
-        for sec_title, items in SECTIONS:
-            sec_header = Label(
-                text=f"[b]{sec_title}[/b]", markup=True,
-                color=get_color_from_hex("#1E3A8A"), font_size='13sp',
-                size_hint_y=None, height=dp(32), halign='left'
-            )
-            sec_header.bind(size=sec_header.setter('text_size'))
-            content.add_widget(sec_header)
-
-            for text, q_type, options in items:
-                self.q_types[q_idx] = q_type
-                self.radio_rows[q_idx] = []
-
-                card = Card(orientation='vertical', size_hint_y=None, padding=dp(12), spacing=dp(5))
-                card.bind(minimum_height=card.setter('height'))
-
-                q_lbl = Label(
-                    text=f"[b]{text}[/b]", markup=True,
-                    color=get_color_from_hex("#0F172A"), font_size='12sp',
-                    size_hint_y=None, height=dp(34), halign='left', valign='middle'
-                )
-                q_lbl.bind(size=q_lbl.setter('text_size'))
-                card.add_widget(q_lbl)
-
-                for score, opt_text in enumerate(options):
-                    row = RadioRow(
-                        text=opt_text,
-                        on_select_cb=lambda qi=q_idx, sc=score: self.select_option(qi, sc)
-                    )
-                    self.radio_rows[q_idx].append(row)
-                    card.add_widget(row)
-
-                content.add_widget(card)
-                q_idx += 1
-
-        # Живой счетчик
-        live_card = Card(
-            bg_color="#E2E8F0", border_color="#CBD5E1",
-            orientation='vertical', size_hint_y=None, height=dp(68), padding=dp(8), spacing=dp(3)
-        )
-        l_row1 = BoxLayout(orientation='horizontal')
-        self.live_anx = Label(text="Тревога: 0 б.", bold=True, color=get_color_from_hex("#1E293B"), font_size='11.5sp')
-        self.live_dep = Label(text="Депрессия: 0 б.", bold=True, color=get_color_from_hex("#1E293B"), font_size='11.5sp')
-        l_row1.add_widget(self.live_anx)
-        l_row1.add_widget(self.live_dep)
-
-        l_row2 = BoxLayout(orientation='horizontal')
-        self.live_slp = Label(text="Сон: 0 б.", bold=True, color=get_color_from_hex("#1E293B"), font_size='11.5sp')
-        self.live_phy = Label(text="Физ. дискомфорт: 0 б.", bold=True, color=get_color_from_hex("#1E293B"), font_size='11.5sp')
-        l_row2.add_widget(self.live_slp)
-        l_row2.add_widget(self.live_phy)
-
-        live_card.add_widget(l_row1)
-        live_card.add_widget(l_row2)
-        content.add_widget(live_card)
-
-        # Кнопка сохранения
-        save_btn = Button(
-            text="Зафиксировать результат за день", bold=True, font_size='13sp',
-            size_hint_y=None, height=dp(46),
-            background_normal='', background_color=get_color_from_hex("#2563EB"),
-            color=get_color_from_hex("#FFFFFF")
-        )
-        save_btn.bind(on_press=self.save_data)
-        content.add_widget(save_btn)
-
-        self.survey_scroll.add_widget(content)
-
-    def init_data_view(self):
-        self.data_container = BoxLayout(orientation='vertical', spacing=dp(8))
-
-        # Карточки KPI
-        kpi_grid = GridLayout(cols=2, spacing=dp(6), size_hint_y=None, height=dp(114))
-        self.kpi_total_card, self.kpi_total_val = self.create_kpi_card("Всего записей")
-        self.kpi_anx_card, self.kpi_anx_val = self.create_kpi_card("Ср. тревога")
-        self.kpi_dep_card, self.kpi_dep_val = self.create_kpi_card("Ср. депрессия")
-        self.kpi_slp_card, self.kpi_slp_val = self.create_kpi_card("Ср. балл сна")
-
-        kpi_grid.add_widget(self.kpi_total_card)
-        kpi_grid.add_widget(self.kpi_anx_card)
-        kpi_grid.add_widget(self.kpi_dep_card)
-        kpi_grid.add_widget(self.kpi_slp_card)
-        self.data_container.add_widget(kpi_grid)
-
-        # Панель кнопок
-        actions_grid = GridLayout(cols=3, spacing=dp(5), size_hint_y=None, height=dp(76))
-        
-        btn_refresh = Button(
-            text="Обновить", font_size='11sp', bold=True,
-            background_normal='', background_color=get_color_from_hex("#FFFFFF"),
-            color=get_color_from_hex("#334155")
-        )
-        btn_refresh.bind(on_press=lambda inst: self.refresh_table_data())
-
-        btn_sync = Button(
-            text="Синхронизация", font_size='11sp', bold=True,
-            background_normal='', background_color=get_color_from_hex("#2563EB"),
-            color=get_color_from_hex("#FFFFFF")
-        )
-        btn_sync.bind(on_press=lambda inst: threading.Thread(target=lambda: self.sync_data(silent=False), daemon=True).start())
-
-        btn_summary = Button(
-            text="Итоги и прогноз", font_size='11sp', bold=True,
-            background_normal='', background_color=get_color_from_hex("#3B82F6"),
-            color=get_color_from_hex("#FFFFFF")
-        )
-        btn_summary.bind(on_press=lambda inst: self.show_summary_popup())
-
-        btn_csv = Button(
-            text="Экспорт CSV", font_size='11sp', bold=True,
-            background_normal='', background_color=get_color_from_hex("#0D9488"),
-            color=get_color_from_hex("#FFFFFF")
-        )
-        btn_csv.bind(on_press=lambda inst: self.export_csv())
-
-        btn_pdf = Button(
-            text="Протокол в PDF", font_size='11sp', bold=True,
-            background_normal='', background_color=get_color_from_hex("#475569"),
-            color=get_color_from_hex("#FFFFFF")
-        )
-        btn_pdf.bind(on_press=lambda inst: self.export_pdf())
-
-        btn_delete = Button(
-            text="Удалить запись", font_size='11sp', bold=True,
-            background_normal='', background_color=get_color_from_hex("#EF4444"),
-            color=get_color_from_hex("#FFFFFF")
-        )
-        btn_delete.bind(on_press=lambda inst: self.delete_selected_record())
-
-        actions_grid.add_widget(btn_refresh)
-        actions_grid.add_widget(btn_sync)
-        actions_grid.add_widget(btn_summary)
-        actions_grid.add_widget(btn_csv)
-        actions_grid.add_widget(btn_pdf)
-        actions_grid.add_widget(btn_delete)
-        self.data_container.add_widget(actions_grid)
-
-        # ТАБЛИЦА С ГОРИЗОНТАЛЬНОЙ ПРОКРУТКОЙ
-        self.table_widths = [
-            dp(45), dp(130), dp(110), dp(55), dp(65),
-            dp(65), dp(100), dp(65), dp(100), dp(50), dp(55)
-        ]
-        total_tbl_w = sum(self.table_widths)
-
-        self.table_hscroll = ScrollView(size_hint=(1, 1), do_scroll_x=True, do_scroll_y=False, bar_width=dp(4))
-        table_inner_box = BoxLayout(orientation='vertical', size_hint=(None, 1), width=total_tbl_w)
-
-        # Шапка таблицы
         tbl_hdr_box = BoxLayout(orientation='horizontal', size_hint=(None, None), width=total_tbl_w, height=dp(34))
         hdr_titles = ["ID", "Дата", "Участник", "Возраст", "Пол", "Тревога", "Статус Т.", "Депрессия", "Статус Д.", "Сон", "Физ."]
         for title, w in zip(hdr_titles, self.table_widths):
@@ -657,7 +433,6 @@ class HADSApp(App):
             tbl_hdr_box.add_widget(lbl)
         table_inner_box.add_widget(tbl_hdr_box)
 
-        # Строки таблицы
         self.table_vscroll = ScrollView(size_hint=(None, 1), width=total_tbl_w, do_scroll_x=False, do_scroll_y=True, bar_width=dp(4))
         self.table_rows_box = BoxLayout(orientation='vertical', size_hint=(None, None), width=total_tbl_w, spacing=dp(2))
         self.table_rows_box.bind(minimum_height=self.table_rows_box.setter('height'))
@@ -706,9 +481,7 @@ class HADSApp(App):
         self.live_phy.text = f"Физ. дискомфорт: {phy} б."
 
     def get_hads_status(self, score):
-        if score <= 7: return "Норма"
-        if score <= 10: return "Субклинический"
-        return "Клинический"
+        return "Норма" if score <= 7 else ("Субклинический" if score <= 10 else "Клинический")
 
     def show_alert(self, title, text):
         layout = BoxLayout(orientation='vertical', padding=dp(12), spacing=dp(10))
@@ -724,7 +497,7 @@ class HADSApp(App):
 
     def save_data(self, instance):
         if len(self.answers) < 20:
-            self.show_alert("Внимание", "Необходимо ответить на все 20 вопросов перед сохранением.")
+            self.show_alert("Внимание", "Требуется ответить на все 20 вопросов перед сохранением.")
             return
 
         fio = self.fio_input.text.strip() or "Студент"
@@ -824,7 +597,7 @@ class HADSApp(App):
 
     def delete_selected_record(self):
         if not self.selected_record_id:
-            self.show_alert("Выбор записи", "Нажмите на строку в таблице для выбора.")
+            self.show_alert("Выбор записи", "Требуется нажать на строку в таблице перед удалением.")
             return
 
         with sqlite3.connect(self.db_path) as conn:
@@ -898,51 +671,46 @@ class HADSApp(App):
         pdf_path = os.path.join(target_dir, "summary_report.pdf")
 
         try:
-            from reportlab.lib.pagesizes import A4
-            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-            from reportlab.lib.styles import ParagraphStyle
-            from reportlab.lib import colors
-            from reportlab.pdfbase import pdfmetrics
-            from reportlab.pdfbase.ttfonts import TTFont
+            from fpdf import FPDF
 
-            system_font = None
-            for p in ["/system/fonts/Roboto-Regular.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "C:\\Windows\\Fonts\\arial.ttf"]:
+            pdf = FPDF(orientation='P', unit='mm', format='A4')
+            pdf.add_page()
+
+            font_path = None
+            for p in ["/system/fonts/Roboto-Regular.ttf", "C:\\Windows\\Fonts\\arial.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"]:
                 if os.path.exists(p):
-                    system_font = p
+                    font_path = p
                     break
 
-            font_name = "Helvetica"
-            if system_font:
-                pdfmetrics.registerFont(TTFont("AppReportFont", system_font))
-                font_name = "AppReportFont"
+            if font_path:
+                pdf.add_font("CustomFont", "", font_path, uni=True)
+                pdf.set_font("CustomFont", "", 13)
+            else:
+                pdf.set_font("Helvetica", "", 12)
 
-            doc = SimpleDocTemplate(pdf_path, pagesize=A4, rightMargin=20, leftMargin=20, topMargin=24, bottomMargin=24)
-            elements = []
+            pdf.cell(0, 10, "СВОДНЫЙ ОТЧЕТ МОНИТОРИНГА (HADS + СОН)", ln=True, align='C')
+            pdf.set_font("CustomFont" if font_path else "Helvetica", "", 9)
+            pdf.cell(0, 7, f"Участник: {rows[-1][2]} | Записей: {len(rows)} | Дата: {datetime.now().strftime('%d.%m.%Y %H:%M')}", ln=True, align='C')
+            pdf.ln(4)
 
-            title_style = ParagraphStyle("TStyle", fontName=font_name, fontSize=14, textColor=colors.HexColor("#1E3A8A"), spaceAfter=8)
-            body_style = ParagraphStyle("BStyle", fontName=font_name, fontSize=9, textColor=colors.HexColor("#0F172A"))
+            col_w = [14, 40, 36, 36, 18, 18]
+            headers = ["ID", "Дата", "Тревога", "Депрессия", "Сон", "Физ."]
 
-            elements.append(Paragraph("СВОДНЫЙ ОТЧЕТ МОНИТОРИНГА (HADS + СОН)", title_style))
-            elements.append(Paragraph(f"Участник: {rows[-1][2]} | Записей: {len(rows)} | Сформирован: {datetime.now().strftime('%d.%m.%Y %H:%M')}", body_style))
-            elements.append(Spacer(1, 12))
+            pdf.set_fill_color(241, 245, 249)
+            for h, w in zip(headers, col_w):
+                pdf.cell(w, 8, h, border=1, align='C', fill=True)
+            pdf.ln()
 
-            tbl_data = [["ID", "Дата", "Участник", "Тревога", "Депрессия", "Сон", "Физ."]]
             for r in rows:
-                tbl_data.append([str(r[0]), str(r[1][:16]), str(r[2]), f"{r[5]} ({r[6][:4]})", f"{r[7]} ({r[8][:4]})", str(r[9]), str(r[10])])
+                pdf.cell(col_w[0], 7, str(r[0]), border=1, align='C')
+                pdf.cell(col_w[1], 7, str(r[1][:16]), border=1, align='C')
+                pdf.cell(col_w[2], 7, f"{r[5]} ({r[6][:4]})", border=1, align='C')
+                pdf.cell(col_w[3], 7, f"{r[7]} ({r[8][:4]})", border=1, align='C')
+                pdf.cell(col_w[4], 7, str(r[9]), border=1, align='C')
+                pdf.cell(col_w[5], 7, str(r[10]), border=1, align='C')
+                pdf.ln()
 
-            t = Table(tbl_data, colWidths=[30, 95, 90, 95, 95, 45, 45])
-            t.setStyle(TableStyle([
-                ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#F1F5F9")),
-                ('TEXTCOLOR', (0,0), (-1,0), colors.HexColor("#334155")),
-                ('FONTNAME', (0,0), (-1,-1), font_name),
-                ('FONTSIZE', (0,0), (-1,-1), 8),
-                ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#CBD5E1")),
-                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-                ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ]))
-            elements.append(t)
-            doc.build(elements)
-
+            pdf.output(pdf_path)
             self.show_alert("Протокол PDF сформирован", f"Файл сохранен в Загрузки:\n{pdf_path}")
         except Exception as e:
             self.show_alert("Ошибка PDF", f"Сбой формирования: {str(e)}")
