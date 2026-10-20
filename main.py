@@ -1,4 +1,4 @@
-import sqlite3, csv, os, json, urllib.request, threading, ssl
+import sqlite3, csv, os
 from datetime import datetime
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
@@ -12,12 +12,8 @@ from kivy.uix.popup import Popup
 from kivy.uix.widget import Widget
 from kivy.core.window import Window
 from kivy.metrics import dp
-from kivy.clock import Clock, mainthread
 from kivy.graphics import Color, RoundedRectangle, Line, Ellipse
 from kivy.utils import get_color_from_hex
-
-ssl._create_default_https_context = ssl._create_unverified_context
-SYNC_URL = "https://zovx-2c6bc-default-rtdb.firebaseio.com/records.json"
 
 Window.clearcolor = get_color_from_hex("#F1F5F9")
 
@@ -53,19 +49,19 @@ SECTIONS = [
          ["Получал с удовольствием", "Иногда увлекался", "Редко появлялся интерес", "Полное безразличие"])
     ]),
     ("2. Оценка качества сна (за прошедшую ночь)", [
-        ("Процесс засыпания минувшей ночью:", "SLEEP",
+        ("Процесс засыпания минувшей ночью:", "SLEEP", 
          ["Быстро (до 15 мин)", "Умеренно (15–30 мин)", "Трудно (30–60 мин)", "Бессонница (>1 часа)"]),
-        ("Непрерывность ночного сна:", "SLEEP",
+        ("Непрерывность ночного сна:", "SLEEP", 
          ["Крепкий сон без пробуждений", "1 кратковременное пробуждение", "Частые пробуждения", "Поверхностный рваный сон"]),
-        ("Восстановление сил и ясность утром:", "SLEEP",
+        ("Восстановление сил и ясность утром:", "SLEEP", 
          ["Полная бодрость и свежесть", "Умеренная работоспособность", "Вялость и сонливость", "Разбитость, отсутствие отдыха"])
     ]),
     ("3. Оценка физического здоровья и тонуса", [
-        ("Мышечный дискомфорт, головная боль или спазмы:", "PHYS",
+        ("Мышечный дискомфорт, головная боль или спазмы:", "PHYS", 
          ["Отсутствуют", "Легкий дискомфорт", "Умеренная боль/напряжение", "Выраженный болевой синдром"]),
-        ("Утомляемость от привычных дел за день:", "PHYS",
+        ("Утомляемость от привычных дел за день:", "PHYS", 
          ["Сил хватает с запасом", "Усталость только к вечеру", "Быстрое утомление днем", "Полное физическое истощение"]),
-        ("Общий соматический тонус организма:", "PHYS",
+        ("Общий соматический тонус организма:", "PHYS", 
          ["Высокий, энергичный", "Стабильный средний", "Сниженный, слабая выносливость", "Выраженная астения"])
     ])
 ]
@@ -356,52 +352,44 @@ class HADSApp(App):
         kpi_grid.add_widget(self.kpi_slp_card)
         self.data_container.add_widget(kpi_grid)
 
-        actions_grid = GridLayout(cols=3, spacing=dp(5), size_hint_y=None, height=dp(76))
+        actions_grid = GridLayout(cols=2, spacing=dp(5), size_hint_y=None, height=dp(114))
         
         btn_refresh = Button(
-            text="Обновить", font_size='11sp', bold=True,
+            text="Обновить таблицу", font_size='11.5sp', bold=True,
             background_normal='', background_color=get_color_from_hex("#FFFFFF"),
             color=get_color_from_hex("#334155")
         )
         btn_refresh.bind(on_press=lambda inst: self.refresh_table_data())
 
-        btn_sync = Button(
-            text="Синхронизация", font_size='11sp', bold=True,
-            background_normal='', background_color=get_color_from_hex("#2563EB"),
-            color=get_color_from_hex("#FFFFFF")
-        )
-        btn_sync.bind(on_press=lambda inst: threading.Thread(target=lambda: self.sync_data(silent=False), daemon=True).start())
-
         btn_summary = Button(
-            text="Итоги и прогноз", font_size='11sp', bold=True,
+            text="Итоги и прогноз", font_size='11.5sp', bold=True,
             background_normal='', background_color=get_color_from_hex("#3B82F6"),
             color=get_color_from_hex("#FFFFFF")
         )
         btn_summary.bind(on_press=lambda inst: self.show_summary_popup())
 
         btn_csv = Button(
-            text="Экспорт CSV", font_size='11sp', bold=True,
+            text="Экспорт CSV", font_size='11.5sp', bold=True,
             background_normal='', background_color=get_color_from_hex("#0D9488"),
             color=get_color_from_hex("#FFFFFF")
         )
         btn_csv.bind(on_press=lambda inst: self.export_csv())
 
         btn_pdf = Button(
-            text="Протокол в PDF", font_size='11sp', bold=True,
+            text="Протокол в PDF", font_size='11.5sp', bold=True,
             background_normal='', background_color=get_color_from_hex("#475569"),
             color=get_color_from_hex("#FFFFFF")
         )
         btn_pdf.bind(on_press=lambda inst: self.export_pdf())
 
         btn_delete = Button(
-            text="Удалить запись", font_size='11sp', bold=True,
+            text="Удалить запись", font_size='11.5sp', bold=True,
             background_normal='', background_color=get_color_from_hex("#EF4444"),
             color=get_color_from_hex("#FFFFFF")
         )
         btn_delete.bind(on_press=lambda inst: self.delete_selected_record())
 
         actions_grid.add_widget(btn_refresh)
-        actions_grid.add_widget(btn_sync)
         actions_grid.add_widget(btn_summary)
         actions_grid.add_widget(btn_csv)
         actions_grid.add_widget(btn_pdf)
@@ -708,69 +696,6 @@ class HADSApp(App):
             self.show_alert("Протокол PDF сформирован", f"Файл сохранен в Загрузки:\n{pdf_path}")
         except Exception as e:
             self.show_alert("Ошибка PDF", f"Сбой формирования: {str(e)}")
-
-    def sync_data(self, silent=False):
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                local_rows = conn.cursor().execute("SELECT date, fio, age, gender, anxiety, anxiety_status, depression, depression_status, sleep, physical FROM results").fetchall()
-
-            req = urllib.request.Request(SYNC_URL, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=5) as response:
-                raw_data = response.read().decode('utf-8')
-                cloud_data = json.loads(raw_data) if raw_data != "null" else {}
-
-            cloud_records = list(cloud_data.values()) if isinstance(cloud_data, dict) else (cloud_data or [])
-            cloud_dates = {rec.get("date") for rec in cloud_records if isinstance(rec, dict)}
-
-            new_to_cloud = 0
-            for r in local_rows:
-                if r[0] not in cloud_dates:
-                    payload = {
-                        "date": r[0], "fio": r[1], "age": r[2], "gender": r[3],
-                        "anxiety": r[4], "anxiety_status": r[5],
-                        "depression": r[6], "depression_status": r[7],
-                        "sleep": r[8], "physical": r[9]
-                    }
-                    post_req = urllib.request.Request(
-                        SYNC_URL,
-                        data=json.dumps(payload).encode('utf-8'),
-                        headers={'Content-Type': 'application/json'}
-                    )
-                    urllib.request.urlopen(post_req, timeout=5)
-                    new_to_cloud += 1
-
-            new_to_local = 0
-            with sqlite3.connect(self.db_path) as conn:
-                for rec in cloud_records:
-                    if isinstance(rec, dict) and rec.get("date"):
-                        cur = conn.cursor()
-                        cur.execute("""
-                            INSERT OR IGNORE INTO results (date, fio, age, gender, anxiety, anxiety_status, depression, depression_status, sleep, physical)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """, (
-                            rec.get("date"), rec.get("fio"), rec.get("age"), rec.get("gender"),
-                            rec.get("anxiety"), rec.get("anxiety_status"),
-                            rec.get("depression"), rec.get("depression_status"),
-                            rec.get("sleep"), rec.get("physical")
-                        ))
-                        if cur.rowcount > 0:
-                            new_to_local += 1
-                conn.commit()
-
-            self.update_ui_after_sync(silent, new_to_cloud, new_to_local)
-        except Exception as e:
-            if not silent:
-                self.show_alert_mainthread("Ошибка синхронизации", str(e))
-
-    @mainthread
-    def update_ui_after_sync(self, silent, new_to_cloud, new_to_local):
-        self.refresh_table_data()
-        if not silent:
-            self.show_alert("Синхронизация", f"Успешно!\nОтправлено в облако: {new_to_cloud}\nЗагружено на телефон: {new_to_local}")
-
-    @mainthread
-    def show_alert_mainthread(self, title, text):
-        self.show_alert(title, text)
 
 if __name__ == '__main__':
     HADSApp().run()
